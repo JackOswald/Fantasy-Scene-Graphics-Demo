@@ -45,6 +45,8 @@ void MyGame::initScene()
 	string vsParallaxFilename = ASSET_PATH + SHADER_PATH + "/parallaxMappingVS.glsl";
 	string fsParallaxFilename = ASSET_PATH + SHADER_PATH + "/parallaxMappingFS.glsl";
 
+	string fsPostFileName = ASSET_PATH + SHADER_PATH + "/colourFilterFS.glsl";
+
 	/*string diffuseTexturePathEarth = ASSET_PATH + TEXTURE_PATH + "/earth_diff.png";
 	string specularTexturePathEarth = ASSET_PATH + TEXTURE_PATH + "/earth_spec.png";
 	string normalTexturePathEarth = ASSET_PATH + TEXTURE_PATH + "/earth_norm.png";
@@ -110,6 +112,12 @@ void MyGame::initScene()
 	m_Light->SpecularColour = vec4(1.0f, 1.0f, 1.0f, 1.0f);
 	m_Light->Direction = vec3(0.0f, 0.0f, -1.0f);
 	m_AmbientLightColour = vec4(1.0f, 1.0f, 1.0f, 1.0f);
+
+	m_PostBuffer = shared_ptr<PostProcessBuffer>(new PostProcessBuffer());
+	m_PostBuffer->create(m_WindowWidth, m_WindowHeight);
+	
+	m_PostEffect = shared_ptr<PostProcessingEffect>(new PostProcessingEffect());
+	m_PostEffect->loadShader(fsPostFileName);
 }
 
 void MyGame::onKeyDown(SDL_Keycode keyCode)
@@ -202,6 +210,10 @@ void MyGame::MoveMouse()
 
 void MyGame::destroyScene()
 {
+
+	m_PostEffect->destroy();
+	m_ScreenQuad->destroy();
+	m_PostBuffer->destroy();
 	for (auto& go : m_GameObjectList)
 	{
 		go->onDestroy();
@@ -232,8 +244,10 @@ void MyGame::update()
 void MyGame::render()
 {
 	GameApplication::render();
+	m_PostBuffer->bind();
 	for (auto& go : m_GameObjectList)
 	{
+		
 		GLuint currentShader = go->getShaderProgram();
 
 		glUseProgram(currentShader);
@@ -255,5 +269,17 @@ void MyGame::render()
 
 		go->onRender(m_ViewMatrix, m_ProjMatrix);
 	}
+
+	m_PostBuffer->unbind();
+
+	m_PostEffect->bind();
+	GLuint currentShader = m_PostEffect->getShaderProgram();
+
+	GLint textureLocation = glGetUniformLocation(currentShader, "texture0");
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, m_PostBuffer->GetTexture());
+	glUniform1i(textureLocation, 0);
+
+	m_ScreenQuad->render();
 
 }
